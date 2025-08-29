@@ -99,7 +99,7 @@ export const FileUpload = React.memo(
             const dm = 3;
             const sizes = localeOption('fileSizeTypes');
 
-            if (bytes === 0) {
+            if (bytes <= 0) {
                 return `0 ${sizes[0]}`;
             }
 
@@ -125,8 +125,9 @@ export const FileUpload = React.memo(
 
             for (let i = 0; i < selectedFiles.length; i++) {
                 let file = selectedFiles[i];
+                const shouldAddFile = props.multiple ? !isFileSelected(file) && validate(file) : validate(file);
 
-                if (!isFileSelected(file) && validate(file)) {
+                if (shouldAddFile) {
                     file.objectURL = window.URL.createObjectURL(file);
 
                     currentFiles.push(file);
@@ -144,6 +145,8 @@ export const FileUpload = React.memo(
             }
 
             clearInput();
+
+            setFocusedState(false);
 
             if (props.mode === 'basic' && currentFiles.length > 0) {
                 fileInputRef.current.style.display = 'none';
@@ -690,7 +693,7 @@ export const FileUpload = React.memo(
                 ptm('label')
             );
             const chooseLabel = chooseOptions.iconOnly ? <span {...labelProps} dangerouslySetInnerHTML={{ __html: '&nbsp;' }} /> : <span {...labelProps}>{chooseButtonLabel}</span>;
-            const label = props.auto ? chooseLabel : <span {...labelProps}>{hasFiles ? filesState[0].name : chooseLabel}</span>;
+            const label = props.auto ? chooseLabel : <span {...labelProps}>{hasFiles ? props.selectedFileLabel || filesState[0].name : chooseLabel}</span>;
             const chooseIconProps = mergeProps(
                 {
                     className: cx('chooseIcon', { iconOnly: chooseOptions.iconOnly })

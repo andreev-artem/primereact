@@ -49,7 +49,8 @@ export const Menubar = React.memo(
                         hide();
                     }
                 }
-            }
+            },
+            options: { capture: true }
         });
 
         const [bindResizeListener, unbindResizeListener] = useResizeListener({
@@ -429,13 +430,13 @@ export const Menubar = React.memo(
         const findFirstFocusedItemIndex = () => {
             const selectedIndex = findSelectedItemIndex();
 
-            return selectedIndex < 0 ? findFirstItemIndex() : selectedIndex;
+            return selectedIndex;
         };
 
         const findLastFocusedItemIndex = () => {
             const selectedIndex = findSelectedItemIndex();
 
-            return selectedIndex < 0 ? findLastItemIndex() : selectedIndex;
+            return selectedIndex;
         };
 
         const searchItems = (event, char) => {

@@ -28,6 +28,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
     const [columnOrderState, setColumnOrderState] = React.useState([]);
     const [groupRowsSortMetaState, setGroupRowsSortMetaState] = React.useState(null);
     const [editingMetaState, setEditingMetaState] = React.useState({});
+    const [frozenEditingMetaState, setFrozenEditingMetaState] = React.useState({});
     const [d_rowsState, setD_rowsState] = React.useState(props.rows);
     const [d_filtersState, setD_filtersState] = React.useState({});
     const metaData = {
@@ -42,6 +43,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
             columnOrder: columnOrderState,
             groupRowsSortMeta: groupRowsSortMetaState,
             editingMeta: editingMetaState,
+            frozenEditingMeta: frozenEditingMetaState,
             d_rows: d_rowsState,
             d_filters: d_filtersState
         },
@@ -316,6 +318,24 @@ export const DataTable = React.forwardRef((inProps, ref) => {
                         })
                     );
                 } else {
+                    const lastMeta = restoredState.multiSortMeta[restoredState.multiSortMeta.length - 1];
+                    const field = lastMeta && lastMeta.field ? lastMeta.field : null;
+
+                    if (field) {
+                        const sortColumn = findColumnByKey(getColumns(), field);
+
+                        if (sortColumn) {
+                            const sortFunction = getColumnProp(sortColumn, 'sortFunction');
+                            const sortable = getColumnProp(sortColumn, 'sortable');
+
+                            if (sortFunction && sortable) {
+                                columnSortFunction.current = sortFunction;
+                                columnSortable.current = sortable;
+                                columnField.current = field;
+                            }
+                        }
+                    }
+
                     setMultiSortMetaState(restoredState.multiSortMeta);
                 }
             }
@@ -503,6 +523,29 @@ export const DataTable = React.forwardRef((inProps, ref) => {
     const clearEditingMetaData = () => {
         if (props.editMode && ObjectUtils.isNotEmpty(editingMetaState)) {
             setEditingMetaState({});
+        }
+    };
+
+    const onFrozenEditingMetaChange = (e) => {
+        const { rowData, field, editingKey, editing } = e;
+        let frozenEditingMeta = { ...frozenEditingMetaState };
+        let meta = frozenEditingMeta[editingKey];
+
+        if (editing) {
+            !meta && (meta = frozenEditingMeta[editingKey] = { data: { ...rowData }, fields: [] });
+            meta.fields.push(field);
+        } else if (meta) {
+            const fields = meta.fields.filter((f) => f !== field);
+
+            !fields.length ? delete frozenEditingMeta[editingKey] : (meta.fields = fields);
+        }
+
+        setFrozenEditingMetaState(frozenEditingMeta);
+    };
+
+    const clearFrozenEditingMetaData = () => {
+        if (props.editMode && ObjectUtils.isNotEmpty(frozenEditingMetaState)) {
+            setFrozenEditingMetaState({});
         }
     };
 
@@ -878,6 +921,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
 
     const onPageChange = (e) => {
         clearEditingMetaData();
+        clearFrozenEditingMetaData();
 
         if (props.onPage) {
             props.onPage(createEvent(e));
@@ -893,6 +937,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
 
     const onSortChange = (e) => {
         clearEditingMetaData();
+        clearFrozenEditingMetaData();
 
         const { originalEvent: event, column, sortableDisabledFields } = e;
         let sortField = getColumnProp(column, 'sortField') || getColumnProp(column, 'field');
@@ -1072,6 +1117,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
 
     const onFilterChange = (filters) => {
         clearEditingMetaData();
+        clearFrozenEditingMetaData();
 
         setD_filtersState(filters);
     };
@@ -1269,6 +1315,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
         setD_filtersState(cloneFilters(props.filters));
         setGroupRowsSortMetaState(null);
         setEditingMetaState({});
+        setFrozenEditingMetaState({});
 
         if (!props.onPage) {
             setFirstState(props.first);
@@ -1318,7 +1365,6 @@ export const DataTable = React.forwardRef((inProps, ref) => {
     const exportCSV = (options) => {
         let data;
         let csv = '\ufeff';
-        let columns = getColumns();
 
         if (options && options.selectionOnly) {
             data = props.selection || [];
@@ -1326,48 +1372,58 @@ export const DataTable = React.forwardRef((inProps, ref) => {
             data = [...(props.frozenValue || []), ...(processedData() || [])];
         }
 
-        //headers
-        columns.forEach((column, i) => {
-            const [field, header, exportHeader, exportable] = [getColumnProp(column, 'field'), getColumnProp(column, 'header'), getColumnProp(column, 'exportHeader'), getColumnProp(column, 'exportable')];
+        // First build collection of exportable columns
+        const exportableColumns = getColumns().filter((column) => {
+            const exportable = getColumnProp(column, 'exportable');
+            const field = getColumnProp(column, 'field');
 
-            if (exportable && field) {
-                const columnHeader = String(exportHeader || header || field)
-                    .replace(/"/g, '""')
-                    .replace(/\n/g, '\u2028');
+            // Column must be exportable (or undefined/not set) and have a field defined
+            return exportable !== false && field;
+        });
 
-                csv = csv + ('"' + columnHeader + '"');
+        // headers
+        exportableColumns.forEach((column, i) => {
+            const [field, header, exportHeader] = [getColumnProp(column, 'field'), getColumnProp(column, 'header'), getColumnProp(column, 'exportHeader')];
 
-                if (i < columns.length - 1) {
-                    csv = csv + props.csvSeparator;
-                }
+            const columnHeader = String(exportHeader || header || field)
+                .replace(/"/g, '""')
+                .replace(/\n/g, '\u2028');
+
+            csv = csv + ('"' + columnHeader + '"');
+
+            if (i < exportableColumns.length - 1) {
+                csv = csv + props.csvSeparator;
             }
         });
 
-        //body
+        // body
         data.forEach((record) => {
             csv = csv + '\n';
-            columns.forEach((column, i) => {
-                const [colField, exportField, exportable] = [getColumnProp(column, 'field'), getColumnProp(column, 'exportField'), getColumnProp(column, 'exportable')];
+            exportableColumns.forEach((column, i) => {
+                const [colField, exportField] = [getColumnProp(column, 'field'), getColumnProp(column, 'exportField')];
                 const field = exportField || colField;
 
-                if (exportable && field) {
-                    let cellData = ObjectUtils.resolveFieldData(record, field);
+                let cellData = ObjectUtils.resolveFieldData(record, field);
 
-                    if (cellData != null) {
-                        if (props.exportFunction) {
-                            cellData = props.exportFunction({ data: cellData, field, rowData: record, column });
-                        } else {
-                            cellData = String(cellData).replace(/"/g, '""').replace(/\n/g, '\u2028');
-                        }
+                if (cellData != null) {
+                    if (props.exportFunction) {
+                        cellData = props.exportFunction({
+                            data: cellData,
+                            field,
+                            rowData: record,
+                            column
+                        });
                     } else {
-                        cellData = '';
+                        cellData = String(cellData).replace(/"/g, '""').replace(/\n/g, '\u2028');
                     }
+                } else {
+                    cellData = '';
+                }
 
-                    csv = csv + ('"' + cellData + '"');
+                csv = csv + ('"' + cellData + '"');
 
-                    if (i < columns.length - 1) {
-                        csv = csv + props.csvSeparator;
-                    }
+                if (i < exportableColumns.length - 1) {
+                    csv = csv + props.csvSeparator;
                 }
             });
         });
@@ -1541,7 +1597,8 @@ export const DataTable = React.forwardRef((inProps, ref) => {
         setSortMeta: (sorts) => setMultiSortMetaState(sorts),
         getElement: () => elementRef.current,
         getTable: () => tableRef.current,
-        getVirtualScroller: () => virtualScrollerRef.current
+        getVirtualScroller: () => virtualScrollerRef.current,
+        getProcessedData: () => processedData()
     }));
 
     const createLoader = () => {
@@ -1650,6 +1707,9 @@ export const DataTable = React.forwardRef((inProps, ref) => {
             <TableBody
                 hostName="DataTable"
                 ref={frozenBodyRef}
+                cellMemo={props.cellMemo}
+                cellMemoProps={props.cellMemoProps}
+                cellMemoPropsDepth={props.cellMemoPropsDepth}
                 cellClassName={props.cellClassName}
                 cellSelection={props.cellSelection}
                 checkIcon={props.checkIcon}
@@ -1661,7 +1721,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
                 dataKey={props.dataKey}
                 dragSelection={props.dragSelection}
                 editMode={props.editMode}
-                editingMeta={editingMetaState}
+                editingMeta={frozenEditingMetaState}
                 editingRows={props.editingRows}
                 emptyMessage={props.emptyMessage}
                 expandableRowGroups={props.expandableRowGroups}
@@ -1680,7 +1740,7 @@ export const DataTable = React.forwardRef((inProps, ref) => {
                 onCellUnselect={props.onCellUnselect}
                 onContextMenu={props.onContextMenu}
                 onContextMenuSelectionChange={props.onContextMenuSelectionChange}
-                onEditingMetaChange={onEditingMetaChange}
+                onEditingMetaChange={onFrozenEditingMetaChange}
                 onRowClick={props.onRowClick}
                 onRowCollapse={props.onRowCollapse}
                 onRowDoubleClick={props.onRowDoubleClick}
@@ -1735,6 +1795,9 @@ export const DataTable = React.forwardRef((inProps, ref) => {
             <TableBody
                 hostName="DataTable"
                 ref={bodyRef}
+                cellMemo={props.cellMemo}
+                cellMemoProps={props.cellMemoProps}
+                cellMemoPropsDepth={props.cellMemoPropsDepth}
                 cellClassName={props.cellClassName}
                 cellSelection={props.cellSelection}
                 checkIcon={props.checkIcon}

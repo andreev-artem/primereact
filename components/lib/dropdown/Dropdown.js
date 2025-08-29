@@ -51,7 +51,15 @@ export const Dropdown = React.memo(
             overlay: overlayRef,
             listener: (event, { type, valid }) => {
                 if (valid) {
-                    type === 'outside' ? !isClearClicked(event) && hide() : hide();
+                    if (type === 'outside') {
+                        if (!isClearClicked(event)) {
+                            hide();
+                        }
+                    } else if (context.hideOverlaysOnDocumentScrolling) {
+                        hide();
+                    } else if (!DomHandler.isDocument(event.target)) {
+                        alignOverlay();
+                    }
                 }
             },
             when: overlayVisibleState
@@ -176,7 +184,11 @@ export const Dropdown = React.memo(
                 option
             });
 
-            isHide && hide(true);
+            if (isHide) {
+                hide(true);
+
+                DomHandler.focus(focusInputRef.current);
+            }
         };
 
         const onPanelClick = (event) => {
@@ -281,13 +293,15 @@ export const Dropdown = React.memo(
                     onArrowLeftKey(event, true);
                     break;
 
-                case 'Escape':
                 case 'Enter':
                 case 'NumpadEnter':
                     onEnterKey(event);
                     event.preventDefault();
                     break;
 
+                case 'Escape':
+                    onEscapeKey(event);
+                    break;
                 default:
                     break;
             }
@@ -482,18 +496,29 @@ export const Dropdown = React.memo(
         };
 
         const onEnterKey = (event) => {
+            event.preventDefault();
+
             if (!overlayVisibleState) {
                 setFocusedOptionIndex(-1);
                 onArrowDownKey(event);
             } else {
-                if (focusedOptionIndex !== -1) {
-                    onOptionSelect(event, visibleOptions[focusedOptionIndex]);
+                if (focusedOptionIndex === -1) {
+                    return;
                 }
 
-                hide();
-            }
+                const focusedOption = visibleOptions[focusedOptionIndex];
+                const optionValue = getOptionValue(focusedOption);
 
-            event.preventDefault();
+                if (optionValue == null || optionValue == undefined) {
+                    hide();
+                    resetFilter();
+                    updateEditableLabel(selectedOption);
+
+                    return;
+                }
+
+                onOptionSelect(event, focusedOption);
+            }
         };
 
         const onEscapeKey = (event) => {
@@ -946,10 +971,6 @@ export const Dropdown = React.memo(
         }, [filterState]);
 
         useUpdateEffect(() => {
-            if (filterState && (!props.options || props.options.length === 0)) {
-                setFilterState('');
-            }
-
             updateInputField();
 
             if (inputRef.current) {
@@ -1100,7 +1121,7 @@ export const Dropdown = React.memo(
                     {
                         className: cx('clearIcon'),
                         onPointerUp: clear,
-                        tabIndex: props.tabIndex || '0',
+                        tabIndex: props.editable ? -1 : props.tabIndex || '0',
                         onKeyDown: onClearIconKeyDown,
                         'aria-label': localeOption('clear')
                     },
@@ -1248,6 +1269,7 @@ export const Dropdown = React.memo(
                         in={overlayVisibleState}
                         isOptionDisabled={isOptionDisabled}
                         isSelected={isSelected}
+                        onOverlayHide={hide}
                         onClick={onPanelClick}
                         onEnter={onOverlayEnter}
                         onEntered={onOverlayEntered}

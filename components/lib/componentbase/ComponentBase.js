@@ -40,6 +40,10 @@ const buttonStyles = `
     flex: 1 1 auto;
 }
 
+.p-button-icon {
+    pointer-events: none;
+}
+
 .p-button-icon-right {
     order: 1;
 }
@@ -91,6 +95,16 @@ const buttonStyles = `
 .p-button-group .p-button:focus {
     position: relative;
     z-index: 1;
+}
+
+.p-button-group-single .p-button:first-of-type {
+    border-top-right-radius: var(--border-radius) !important;
+    border-bottom-right-radius: var(--border-radius) !important;
+}
+
+.p-button-group-single .p-button:last-of-type {
+    border-top-left-radius: var(--border-radius) !important;
+    border-bottom-left-radius: var(--border-radius) !important;
 }
 `;
 const inputTextStyles = `
@@ -596,7 +610,7 @@ export const useHandleStyle = (styles, _isUnstyled = () => {}, config) => {
     const { load: loadBaseStyle } = useStyle(baseStyle, { name: 'base', manual: true });
     const { load: loadCommonStyle } = useStyle(commonStyle, { name: 'common', manual: true });
     const { load: loadGlobalStyle } = useStyle(globalCSS, { name: 'global', manual: true });
-    const { load } = useStyle(styles, { name: name, manual: true });
+    const { load: loadComponentStyle } = useStyle(styles, { name: name, manual: true });
 
     const hook = (hookName) => {
         if (!hostName) {
@@ -610,12 +624,19 @@ export const useHandleStyle = (styles, _isUnstyled = () => {}, config) => {
 
     hook('useMountEffect');
     useMountEffect(() => {
+        // Load base and global styles first as they are always needed
         loadBaseStyle();
         loadGlobalStyle();
-        loadCommonStyle();
 
-        if (!styled) {
-            load();
+        // Only load additional styles if component is styled
+        if (!_isUnstyled()) {
+            // Load common styles shared across components
+            loadCommonStyle();
+
+            // Load component-specific styles if not explicitly styled
+            if (!styled) {
+                loadComponentStyle();
+            }
         }
     });
 

@@ -45,8 +45,14 @@ export const ColorPicker = React.memo(
         const [bindOverlayListener, unbindOverlayListener] = useOverlayListener({
             target: elementRef,
             overlay: overlayRef,
-            listener: (event, { valid }) => {
-                valid && hide();
+            listener: (event, { valid, type }) => {
+                if (valid) {
+                    if (context.hideOverlaysOnDocumentScrolling || type === 'outside') {
+                        hide();
+                    } else if (!DomHandler.isDocument(event.target)) {
+                        alignOverlay();
+                    }
+                }
             },
             when: overlayVisibleState
         });
@@ -95,6 +101,7 @@ export const ColorPicker = React.memo(
             hueDragging.current = true;
             pickHue(event);
             !isUnstyled && DomHandler.addClass(elementRef.current, 'p-colorpicker-dragging');
+            event.preventDefault();
         };
 
         const getPositionY = (event) => {

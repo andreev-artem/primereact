@@ -69,6 +69,7 @@ export const MultiSelectPanel = React.memo(
                     getOptionValue={props.getOptionValue}
                     updateModel={props.updateModel}
                     onFilter={onFilterInputChange}
+                    onFilterKeyDown={props.onFilterKeyDown}
                     filterPlaceholder={props.filterPlaceholder}
                     onClose={props.onCloseClick}
                     showSelectAll={props.showSelectAll}
@@ -265,7 +266,8 @@ export const MultiSelectPanel = React.memo(
                 {
                     className: classNames(props.panelClassName, cx('panel', { panelProps: props, context, allowOptionSelect })),
                     style: props.panelStyle,
-                    onClick: props.onClick
+                    onClick: props.onClick,
+                    'data-pr-is-overlay': true
                 },
                 getPTOptions('panel')
             );

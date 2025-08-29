@@ -91,7 +91,7 @@ export const InputOtp = React.memo(
 
             if (event.nativeEvent.inputType === 'deleteContentBackward') {
                 moveToPrevInput(event);
-            } else if (event.nativeEvent.inputType === 'insertText' || event.nativeEvent.inputType === 'deleteContentForward') {
+            } else if (event.nativeEvent.inputType === 'insertText') {
                 moveToNextInput(event);
             }
         };
@@ -147,6 +147,18 @@ export const InputOtp = React.memo(
                     break;
                 }
 
+                case 'Delete': {
+                    event.preventDefault();
+                    const idx = Number(event.target.id);
+
+                    if (!Number.isNaN(idx) && !isAllEmpty(tokens, props.length)) {
+                        updateTokens({ ...event, target: { ...event.target, value: '' } }, idx);
+                        moveToNextInput(event);
+                    }
+
+                    break;
+                }
+
                 case 'Backspace': {
                     if (event.target?.value?.length === 0) {
                         moveToPrevInput(event);
@@ -165,6 +177,8 @@ export const InputOtp = React.memo(
 
                 case 'Tab':
 
+                case 'NumpadEnter':
+
                 case 'Enter': {
                     break;
                 }
@@ -178,6 +192,10 @@ export const InputOtp = React.memo(
                     break;
                 }
             }
+        };
+
+        const isAllEmpty = (arr, n) => {
+            return arr.length === n && arr.every((item) => item === '' || item == null);
         };
 
         useUpdateEffect(() => {
@@ -200,19 +218,16 @@ export const InputOtp = React.memo(
                 onPaste
             };
             const inputElementProps = {
-                id: inputElementIndex,
                 value: tokens[inputElementIndex] || '',
-                inputMode: props?.integerOnly ? 'numeric' : 'text',
                 type: props?.mask ? 'password' : 'text',
                 variant: props?.variant,
                 readOnly: props?.readOnly,
                 disabled: props?.disabled,
-                invalid: props?.invalid,
                 tabIndex: props?.tabIndex,
-                unstyled: props?.unstyled,
+                autoFocus: props?.autoFocus && inputElementIndex === 0,
                 'aria-label': ariaLabel('otpLabel', { 0: inputElementIndex + 1 }),
-                className: cx('input'),
-                pt: ptm('input')
+                'data-index': inputElementIndex,
+                className: cx('input')
             };
             const inputElement = props?.inputTemplate ? (
                 ObjectUtils.getJSXElement(props?.inputTemplate, {
@@ -220,11 +235,11 @@ export const InputOtp = React.memo(
                     props: inputElementProps
                 })
             ) : (
-                <InputText {...inputElementProps} {...inputElementEvents} key={inputElementIndex} />
+                <InputText {...inputElementProps} {...inputElementEvents} invalid={props?.invalid} unstyled={props?.unstyled} pt={ptm('input')} inputMode={props?.integerOnly ? 'numeric' : 'text'} key={inputElementIndex} />
             );
             const inputElements = [inputElement, ...createInputElements(remainingInputs - 1)];
 
-            return inputElements;
+            return inputElements.map((input, index) => <React.Fragment key={index}>{input}</React.Fragment>);
         };
 
         const rootElementProps = mergeProps(

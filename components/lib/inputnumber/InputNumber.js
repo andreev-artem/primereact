@@ -49,7 +49,7 @@ export const InputNumber = React.memo(
         const stacked = props.showButtons && props.buttonLayout === 'stacked';
         const horizontal = props.showButtons && props.buttonLayout === 'horizontal';
         const vertical = props.showButtons && props.buttonLayout === 'vertical';
-        const inputMode = props.inputMode || (props.mode === 'decimal' && !props.minFractionDigits ? 'numeric' : 'decimal');
+        const inputMode = props.inputMode || (props.mode === 'decimal' && !props.minFractionDigits && !props.maxFractionDigits ? 'numeric' : 'decimal');
 
         const getOptions = () => {
             return {
@@ -213,6 +213,10 @@ export const InputNumber = React.memo(
             return null;
         };
 
+        const addWithPrecision = (base, increment, precision = 10) => {
+            return Math.round((base + increment) * precision) / precision;
+        };
+
         const repeat = (event, interval, dir) => {
             let i = interval || 500;
 
@@ -228,7 +232,7 @@ export const InputNumber = React.memo(
             if (inputRef.current) {
                 let step = props.step * dir;
                 let currentValue = parseValue(inputRef.current.value) || 0;
-                let newValue = validateValue(currentValue + step);
+                let newValue = validateValue(addWithPrecision(currentValue, step));
 
                 if (props.maxLength && props.maxLength < formatValue(newValue).length) {
                     return;
@@ -555,6 +559,11 @@ export const InputNumber = React.memo(
                     let char = event.key;
 
                     if (char) {
+                        // get decimal separator in current locale
+                        if (char === '.') {
+                            char = _decimalSeparator.current;
+                        }
+
                         const _isDecimalSign = isDecimalSign(char);
                         const _isMinusSign = isMinusSign(char);
 
@@ -576,11 +585,22 @@ export const InputNumber = React.memo(
 
             let data = (event.clipboardData || window.clipboardData).getData('Text');
 
+            if (props.inputId === 'integeronly' && /[^\d-]/.test(data)) {
+                return;
+            }
+
             if (data) {
                 let filteredData = parseValue(data);
 
                 if (filteredData != null) {
-                    insert(event, filteredData.toString());
+                    if (isFloat(filteredData)) {
+                        const formattedValue = formatValue(filteredData);
+
+                        inputRef.current.value = formattedValue;
+                        updateModel(event, filteredData);
+                    } else {
+                        insert(event, filteredData.toString());
+                    }
                 }
             }
         };
@@ -680,6 +700,7 @@ export const InputNumber = React.memo(
             let inputValue = inputRef.current.value.trim();
             const { decimalCharIndex, minusCharIndex, suffixCharIndex, currencyCharIndex } = getCharIndexes(inputValue);
             const maxFractionDigits = numberFormat.current.resolvedOptions().maximumFractionDigits;
+            const hasBoundOrAffix = props.min || props.max || props.suffix || props.prefix; //only exception
             let newValueStr;
 
             if (sign.isMinusSign) {
@@ -702,8 +723,12 @@ export const InputNumber = React.memo(
                     newValueStr = insertText(inputValue, text, selectionStart, selectionEnd);
                     updateValue(event, newValueStr, text, 'insert');
                 } else if (decimalCharIndex === -1 && (maxFractionDigits || props.maxFractionDigits)) {
-                    newValueStr = insertText(inputValue, text, selectionStart, selectionEnd);
-                    updateValue(event, newValueStr, text, 'insert');
+                    const allowedDecimal = inputMode !== 'numeric' || (inputMode === 'numeric' && hasBoundOrAffix);
+
+                    if (allowedDecimal) {
+                        newValueStr = insertText(inputValue, text, selectionStart, selectionEnd);
+                        updateValue(event, newValueStr, text, 'insert');
+                    }
                 }
             } else {
                 const operation = selectionStart !== selectionEnd ? 'range-insert' : 'insert';

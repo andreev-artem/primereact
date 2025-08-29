@@ -75,7 +75,7 @@ export const Dialog = React.forwardRef((inProps, ref) => {
         let activeElement = document.activeElement;
         let isActiveElementInDialog = activeElement && dialogRef.current && dialogRef.current.contains(activeElement);
 
-        if (!isActiveElementInDialog && props.closable && props.showHeader && closeRef.current) {
+        if (!isActiveElementInDialog && props.closable && props.showCloseIcon && props.showHeader && closeRef.current) {
             closeRef.current.focus();
         }
     };
@@ -116,7 +116,6 @@ export const Dialog = React.forwardRef((inProps, ref) => {
             dragging.current = true;
             lastPageX.current = event.pageX;
             lastPageY.current = event.pageY;
-            dialogRef.current.style.margin = '0';
             DomHandler.addClass(document.body, 'p-unselectable-text');
 
             props.onDragStart && props.onDragStart(event);
@@ -145,7 +144,7 @@ export const Dialog = React.forwardRef((inProps, ref) => {
                     dialogRef.current.style.left = leftPos - leftMargin + 'px';
                 }
 
-                if (topPos >= props.minY && topPos + height < viewport.height) {
+                if (topPos >= props.minY && (deltaY < 0 || topPos + height < viewport.height)) {
                     lastPageY.current = event.pageY;
                     dialogRef.current.style.top = topPos - topMargin + 'px';
                 }
@@ -212,11 +211,11 @@ export const Dialog = React.forwardRef((inProps, ref) => {
                 newHeight = newHeight + deltaY;
             }
 
-            if ((!minWidth || newWidth > minWidth) && offset.left + newWidth < viewport.width) {
+            if ((!minWidth || newWidth > minWidth) && (deltaX < 0 || offset.left + newWidth < viewport.width)) {
                 dialogRef.current.style.width = newWidth + 'px';
             }
 
-            if ((!minHeight || newHeight > minHeight) && offset.top + newHeight < viewport.height) {
+            if ((!minHeight || newHeight > minHeight) && (deltaY < 0 || offset.top + newHeight < viewport.height)) {
                 dialogRef.current.style.height = newHeight + 'px';
             }
 
@@ -429,7 +428,7 @@ export const Dialog = React.forwardRef((inProps, ref) => {
     }));
 
     const createCloseIcon = () => {
-        if (props.closable) {
+        if (props.closable && props.showCloseIcon) {
             const labelAria = props.ariaCloseIconLabel || ariaLabel('close');
 
             const closeButtonIconProps = mergeProps(

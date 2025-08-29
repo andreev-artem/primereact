@@ -51,10 +51,14 @@ export const Menu = React.memo(
         const [bindOverlayListener, unbindOverlayListener] = useOverlayListener({
             target: targetRef,
             overlay: menuRef,
-            listener: (event, { valid }) => {
+            listener: (event, { valid, type }) => {
                 if (valid) {
-                    hide(event);
-                    setFocusedOptionIndex(-1);
+                    if (context.hideOverlaysOnDocumentScrolling || type === 'outside') {
+                        hide(event);
+                        setFocusedOptionIndex(-1);
+                    } else if (!DomHandler.isDocument(event.target)) {
+                        DomHandler.absolutePosition(menuRef.current, targetRef.current, props.popupAlignment);
+                    }
                 }
             },
             when: visibleState
@@ -119,6 +123,10 @@ export const Menu = React.memo(
         };
 
         const onListBlur = (event) => {
+            const { currentTarget, relatedTarget } = event;
+
+            if (relatedTarget && currentTarget.contains(relatedTarget)) return;
+
             setFocused(false);
             setFocusedOptionIndex(-1);
             props.onBlur && props.onBlur(event);
@@ -321,6 +329,10 @@ export const Menu = React.memo(
         };
 
         const createSeparator = (item, index) => {
+            if (item.visible === false) {
+                return null;
+            }
+
             const key = idState + '_separator_' + index;
             const separatorProps = mergeProps(
                 {
@@ -335,6 +347,10 @@ export const Menu = React.memo(
         };
 
         const createMenuItem = (item, index, parentId = null) => {
+            if (item.visible === false) {
+                return null;
+            }
+
             const menuContext = { item, index, parentId };
             const linkClassName = classNames('p-menuitem-link', { 'p-disabled': item.disabled });
             const iconClassName = classNames('p-menuitem-icon', item.icon);
@@ -389,6 +405,7 @@ export const Menu = React.memo(
             if (item.template) {
                 const defaultContentOptions = {
                     onClick: (event) => onItemClick(event, item, key),
+                    onMouseMove: (event) => onItemMouseMove(event, key),
                     className: linkClassName,
                     tabIndex: '-1',
                     labelClassName: 'p-menuitem-text',
@@ -404,6 +421,7 @@ export const Menu = React.memo(
                 {
                     id: key,
                     className: classNames(item.className, cx('menuitem', { focused: focusedOptionIndex === key })),
+                    onClick: (event) => onItemClick(event, item, key),
                     style: sx('menuitem', { item }),
                     role: 'menuitem',
                     'aria-label': item.label,

@@ -3,8 +3,11 @@ import { DomHandler, ObjectUtils, classNames } from '@/components/lib/utils/Util
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useRef, useState } from 'react';
+import AppContentContext from '@/components/layout/appcontentcontext';
+import { useContext } from 'react';
 
 export function DocSectionNav({ docs = [] }) {
+    const { darkMode } = useContext(AppContentContext);
     const router = useRouter();
     const [activeId, setActiveId] = useState(null);
     const navRef = useRef(null);
@@ -97,8 +100,10 @@ export function DocSectionNav({ docs = [] }) {
     };
 
     return (
-        <ul ref={navRef} className="doc-section-nav">
-            {docs.map((item) => createItem(item))}
-        </ul>
+        <div className="doc-section-nav-container">
+            <ul ref={navRef} className="doc-section-nav">
+                {docs.map((item) => createItem(item))}
+            </ul>
+        </div>
     );
 }
